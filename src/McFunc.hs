@@ -1,40 +1,49 @@
-module McFunc where
+{-# LANGUAGE NoImplicitPrelude #-}
+
+module McFunc (module Prelude, module McFunc) where
 
 import Control.Monad (ap, liftM)
 import Data.HashMap.Strict
 import Data.Hashable (Hashable (hashWithSalt), hash)
 import Data.List (intercalate)
+import Numeric (showHex)
+import Prelude hiding ()
 
 newtype McFunction = McFunction {runFunction :: [String]} deriving (Eq)
+
+functionToFile :: McFunction -> String
+functionToFile McFunction{runFunction = functionLines} = intercalate "\n" functionLines
 
 instance Hashable McFunction where
   hashWithSalt salt (McFunction runFunction) = hashWithSalt salt runFunction
 
 instance Show McFunction where
   show :: McFunction -> String
-  show (McFunction functionLines) = show $ intercalate "\n" functionLines
+  show = show . functionToFile
 
 data DatapackM a = DatapackM
   { currentFunction :: McFunction
-  , files :: HashMap String McFunction
+  , files :: HashMap FilePath McFunction
   , runDatapackM :: a
   }
 
-runCommand :: String -> DatapackM ()
-runCommand cmd = DatapackM{currentFunction = McFunction [cmd], files = empty, runDatapackM = ()}
-
 newFunctionWithName :: String -> DatapackM () -> DatapackM String
-newFunctionWithName name DatapackM{currentFunction, files} =
+newFunctionWithName path DatapackM{currentFunction, files} =
   DatapackM
     { currentFunction = McFunction []
-    , files = insert name currentFunction files
-    , runDatapackM = name
+    , files = insert (path ++ ".mcfunction") currentFunction files
+    , runDatapackM = path
     }
+
+formatHash :: Int -> String
+formatHash n
+  | 0 <= n = showHex n ""
+  | otherwise = 'n' : showHex (-n) ""
 
 newFunction :: DatapackM () -> DatapackM String
 newFunction datapack = newFunctionWithName name datapack
  where
-  name = show (hash $ currentFunction datapack) ++ ".mcfunction"
+  name = formatHash (hash $ currentFunction datapack)
 
 instance Monad DatapackM where
   return = pure
@@ -53,3 +62,13 @@ instance Applicative DatapackM where
 
 instance Functor DatapackM where
   fmap = liftM
+
+-- User facing function
+
+runCommand :: String -> DatapackM ()
+runCommand cmd = DatapackM{currentFunction = McFunction [cmd], files = empty, runDatapackM = ()}
+
+runAsFunction :: DatapackM () -> DatapackM ()
+runAsFunction d = do
+  path <- newFunction d
+  runCommand $ "function datapack:" ++ path

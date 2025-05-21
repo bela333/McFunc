@@ -95,6 +95,8 @@ executable mcfunc
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.18.3.0,
+        unordered-containers >= 0.2.20,
+        filepath >= 1.5.4.0,
         mcfunc
 
     -- Directories containing source files.
