@@ -67,7 +67,7 @@ getContext = DatapackM $ \ctx ->
 resolveDatapack :: DatapackM a -> DatapackM (DatapackRes a)
 resolveDatapack datapack = runDatapackM datapack <$> getContext
 
-newFunctionWithName :: String -> DatapackM () -> DatapackM String
+newFunctionWithName :: String -> DatapackM () -> DatapackM ()
 newFunctionWithName name datapack = do
   DatapackRes{currentFunction, files} <- resolveDatapack datapack
   DatapackM $
@@ -75,7 +75,7 @@ newFunctionWithName name datapack = do
       DatapackRes
         { currentFunction = McFunction []
         , files = insert (name ++ ".mcfunction") currentFunction files
-        , datapackResValue = name
+        , datapackResValue = ()
         }
 
 formatHash :: Int -> String
@@ -88,6 +88,7 @@ newFunction datapack = do
   DatapackRes{currentFunction} <- resolveDatapack datapack
   let name = formatHash (hash currentFunction)
   newFunctionWithName name datapack
+  return name
 
 -- User facing functions
 

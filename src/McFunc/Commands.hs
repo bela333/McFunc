@@ -18,3 +18,6 @@ asFunction d = do
   path <- newFunction d
   ctx <- getContext
   runCommand $ "function " ++ datapackName ctx ++ ":" ++ path
+
+say :: String -> DatapackM ()
+say = runCommand . ("say " ++)

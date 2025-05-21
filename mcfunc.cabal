@@ -59,7 +59,13 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  McFunc, McFunc.Prelude, McFunc.Commands
+    exposed-modules: 
+      McFunc,
+      McFunc.Prelude,
+      McFunc.Commands,
+      McFunc.Selector,
+      McFunc.Commands.Execute,
+      McFunc.Scoreboard
     -- Modules included in this library but not exported.
     -- other-modules:
 
