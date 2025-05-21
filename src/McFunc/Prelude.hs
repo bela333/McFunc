@@ -4,6 +4,6 @@ module McFunc.Prelude (module Prelude, module McFunc, module McFunc.Commands, mo
 
 import McFunc (DatapackM, newFunctionWithName, writeDatapack)
 import McFunc.Commands
-import McFunc.Scoreboard (McBoolean (McBoolean), McBooleanCompare (McLT), Scoreboard, ifThenElse, (<), (<=), (==), (>), (>=))
+import McFunc.Scoreboard (McBoolean (McBoolean), McBooleanCompare (McLT), Scoreboard (..), ifThenElse, (<), (<=), (==), (>), (>=))
 import McFunc.Selector (Selector (..), SelectorPart (..))
 import Prelude hiding ((/=), (<), (<=), (==), (>), (>=))
