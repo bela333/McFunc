@@ -2,16 +2,13 @@
 
 module Main where
 
-import Control.Monad (forM_)
-import Data.HashMap.Strict (toList)
-import McFunc
-import System.FilePath
+import McFunc.Prelude
 
 myFunction :: DatapackM ()
 myFunction = do
   runCommand "say asd"
   runCommand "say asdasd"
-  runAsFunction $ do
+  asFunction $ do
     runCommand "say test"
 
 myDatapack :: DatapackM ()
@@ -20,11 +17,4 @@ myDatapack = do
   return ()
 
 main :: IO ()
-main = do
-  let datapackFiles = toList $ files myDatapack
-  let datapackPath :: FilePath
-      datapackPath = "datapack"
-  forM_ datapackFiles $ \(functionName, function) -> do
-    let filePath = datapackPath </> functionName
-    writeFile filePath $ functionToFile function
-    return ()
+main = writeDatapack myDatapack "test" "datapack"
