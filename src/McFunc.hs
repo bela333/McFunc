@@ -1,7 +1,8 @@
 module McFunc (module McFunc) where
 
 import Control.Monad (ap, forM_, liftM)
-import Data.HashMap.Strict
+import Control.Monad.Fix (MonadFix (mfix))
+import Data.HashMap.Lazy
 import Data.Hashable (Hashable (hashWithSalt), hash)
 import Data.List (intercalate)
 import Numeric (showHex)
@@ -55,6 +56,9 @@ instance Applicative DatapackM where
 
 instance Functor DatapackM where
   fmap = liftM
+
+instance MonadFix DatapackM where
+  mfix f = DatapackM $ \ctx -> let go = runDatapackM (f (datapackResValue go)) ctx in go
 
 getContext :: DatapackM DatapackContext
 getContext = DatapackM $ \ctx ->

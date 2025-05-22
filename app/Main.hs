@@ -21,10 +21,18 @@ myFunction = do
       say "More Bar"
       say "Cool"
 
+recursive :: DatapackM ()
+recursive = recMc "recursive" $ \recursive -> do
+  say "Forevah"
+  recursive
+
 myDatapack :: DatapackM ()
 myDatapack = do
   newFunctionWithName "main" myFunction
+  recursive
   return ()
 
 main :: IO ()
-main = writeDatapack myDatapack "mydatapack" "datapack"
+main = do
+  putStrLn "Running"
+  writeDatapack myDatapack "mydatapack" "datapack"
