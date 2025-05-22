@@ -22,7 +22,7 @@ myFunction = do
       say "Cool"
 
 recursive :: DatapackM ()
-recursive = recMc "recursive" $ \recursive -> do
+recursive = rec "recursive" $ \recursive -> do
   say "Forevah"
   recursive
 

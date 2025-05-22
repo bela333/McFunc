@@ -27,18 +27,8 @@ asFunctionWithName name d = do
   ctx <- getContext
   runCommand $ "function " ++ datapackName ctx ++ ":" ++ name
 
-recMc :: String -> (DatapackM () -> DatapackM ()) -> DatapackM ()
-recMc name f = join $ mfix $ \prev -> do
-  datapack <- resolveDatapack prev
-  let newDatapack =
-        DatapackM $
-          const
-            DatapackRes
-              { currentFunction = currentFunction datapack
-              , files = empty
-              , datapackResValue = ()
-              }
-  return $ asFunctionWithName name (f newDatapack)
+rec :: String -> (DatapackM () -> DatapackM ()) -> DatapackM ()
+rec name f = join $ mfix $ \prev -> return $ asFunctionWithName name (f $ loseFiles prev)
 
 say :: String -> DatapackM ()
 say = runCommand . ("say " ++)

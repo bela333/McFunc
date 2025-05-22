@@ -71,6 +71,9 @@ getContext = DatapackM $ \ctx ->
 resolveDatapack :: DatapackM a -> DatapackM (DatapackRes a)
 resolveDatapack datapack = runDatapackM datapack <$> getContext
 
+loseFiles :: DatapackM () -> DatapackM ()
+loseFiles d = DatapackM $ \ctx -> let datapack = runDatapackM d ctx in datapack{files = empty}
+
 newFunctionWithName :: String -> DatapackM () -> DatapackM ()
 newFunctionWithName name datapack = do
   DatapackRes{currentFunction, files} <- resolveDatapack datapack
