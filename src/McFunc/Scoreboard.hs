@@ -1,7 +1,6 @@
 module McFunc.Scoreboard where
 
-import McFunc (DatapackContext (..), DatapackM, getContext, newFunction)
-import McFunc.Commands (runCommand)
+import McFunc (CommandPart (CommandString), DatapackM, runRawCommand, unsafeNewFunction)
 import McFunc.Selector
 
 type Objective = String
@@ -47,9 +46,9 @@ infix 4 >=
 
 ifThenElse :: McBoolean -> DatapackM () -> DatapackM () -> DatapackM ()
 ifThenElse bool ifTrue ifFalse = do
-  ifTrueFunc <- newFunction ifTrue
-  ifFalseFunc <- newFunction ifFalse
-
-  DatapackContext{datapackName} <- getContext
-  runCommand $ "execute if score " ++ show bool ++ " run function " ++ datapackName ++ ":" ++ ifTrueFunc
-  runCommand $ "execute unless score " ++ show bool ++ " run function " ++ datapackName ++ ":" ++ ifFalseFunc
+  do
+    ifTrueFunc <- unsafeNewFunction ifTrue
+    runRawCommand [CommandString $ "execute if score " ++ show bool ++ " run function", ifTrueFunc]
+  do
+    ifFalseFunc <- unsafeNewFunction ifFalse
+    runRawCommand [CommandString $ "execute unless score " ++ show bool ++ " run function", ifFalseFunc]

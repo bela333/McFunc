@@ -2,31 +2,46 @@ module McFunc (module McFunc) where
 
 import Control.Monad (ap, forM_, liftM)
 import Control.Monad.Fix (MonadFix (mfix))
-import Data.HashMap.Lazy
 import Data.Hashable (Hashable (hashWithSalt), hash)
-import Data.List (intercalate)
+import Data.List (intercalate, nub)
 import Numeric (showHex)
 import System.FilePath ((</>))
 
 type DatapackName = String
 
-newtype McFunction = McFunction {runFunction :: [String]} deriving (Eq)
+data CommandPart = CommandString String | CommandFunc Int deriving (Eq)
+type Command = [CommandPart]
+type McFunction = [Command]
 
-functionToFile :: McFunction -> String
-functionToFile McFunction{runFunction = functionLines} = intercalate "\n" functionLines
+instance Show CommandPart where
+  show (CommandString str) = str
+  show (CommandFunc ref) = "\\" ++ show ref ++ "\\"
 
-instance Show McFunction where
-  show :: McFunction -> String
-  show = show . functionToFile
+instance Hashable CommandPart where
+  hashWithSalt salt (CommandString str) = salt `hashWithSalt` (0 :: Int) `hashWithSalt` str
+  hashWithSalt salt (CommandFunc n) = salt `hashWithSalt` (1 :: Int) `hashWithSalt` n
 
-instance Hashable McFunction where
-  hashWithSalt salt (McFunction runFunction) = hashWithSalt salt runFunction
+refPatchPart :: Int -> CommandPart -> CommandPart
+refPatchPart n (CommandFunc m) = CommandFunc $ n + m
+refPatchPart _ a = a
+
+showCommand :: Command -> String
+showCommand command = unwords $ map show command
+
+refPatchCommand :: Int -> Command -> Command
+refPatchCommand n = map (refPatchPart n)
+
+showFunction :: McFunction -> String
+showFunction function = intercalate "\n" $ map showCommand function
+
+refPatchFunction :: Int -> McFunction -> McFunction
+refPatchFunction n = map (refPatchCommand n)
 
 newtype DatapackContext = DatapackContext {datapackName :: DatapackName}
 
 data DatapackRes a = DatapackRes
   { currentFunction :: McFunction
-  , files :: HashMap FilePath McFunction
+  , files :: [McFunction]
   , datapackResValue :: a
   }
 
@@ -37,19 +52,20 @@ instance Monad DatapackM where
   a >>= b = DatapackM $ \ctx ->
     let aRes = runDatapackM a ctx
      in let bRes = runDatapackM (b (datapackResValue aRes)) ctx
-         in DatapackRes
-              { currentFunction = McFunction $ runFunction (currentFunction aRes) ++ runFunction (currentFunction bRes)
-              , files = files aRes `union` files bRes
-              , datapackResValue = datapackResValue bRes
-              }
+         in let fileLen = length $ files aRes
+             in DatapackRes
+                  { currentFunction = currentFunction aRes ++ refPatchFunction fileLen (currentFunction bRes)
+                  , files = files aRes ++ map (refPatchFunction fileLen) (files bRes)
+                  , datapackResValue = datapackResValue bRes
+                  }
 
 instance Applicative DatapackM where
   pure x =
     DatapackM $
       const
         DatapackRes
-          { currentFunction = McFunction []
-          , files = empty
+          { currentFunction = []
+          , files = []
           , datapackResValue = x
           }
   (<*>) = ap
@@ -60,50 +76,77 @@ instance Functor DatapackM where
 instance MonadFix DatapackM where
   mfix f = DatapackM $ \ctx -> let go = runDatapackM (f (datapackResValue go)) ctx in go
 
+runRawCommand :: Command -> DatapackM ()
+runRawCommand command =
+  DatapackM $
+    const
+      DatapackRes
+        { currentFunction = [command]
+        , files = []
+        , datapackResValue = ()
+        }
+
 getContext :: DatapackM DatapackContext
 getContext = DatapackM $ \ctx ->
   DatapackRes
-    { currentFunction = McFunction []
-    , files = empty
+    { currentFunction = []
+    , files = []
     , datapackResValue = ctx
     }
 
 resolveDatapack :: DatapackM a -> DatapackM (DatapackRes a)
 resolveDatapack datapack = runDatapackM datapack <$> getContext
 
-loseFiles :: DatapackM () -> DatapackM ()
-loseFiles d = DatapackM $ \ctx -> let datapack = runDatapackM d ctx in datapack{files = empty}
-
-newFunctionWithName :: String -> DatapackM () -> DatapackM ()
-newFunctionWithName name datapack = do
-  DatapackRes{currentFunction, files} <- resolveDatapack datapack
-  DatapackM $
-    const $
-      DatapackRes
-        { currentFunction = McFunction []
-        , files = insert (name ++ ".mcfunction") currentFunction files
-        , datapackResValue = ()
-        }
-
 formatHash :: Int -> String
 formatHash n
   | 0 <= n = showHex n ""
   | otherwise = 'n' : showHex (-n) ""
 
-newFunction :: DatapackM () -> DatapackM String
-newFunction datapack = do
-  DatapackRes{currentFunction} <- resolveDatapack datapack
-  let name = formatHash (hash currentFunction)
-  newFunctionWithName name datapack
-  return name
+-- Adds function to monad without calling `function` on it
+-- Returned CommandPart must be used before any new files are created
+unsafeNewFunction :: DatapackM () -> DatapackM CommandPart
+unsafeNewFunction datapack = DatapackM $ \ctx ->
+  let DatapackRes{files, currentFunction} = runDatapackM datapack ctx
+   in DatapackRes
+        { currentFunction =
+            []
+        , files = files ++ [currentFunction]
+        , -- Return value refers to the previous file in the stack (`currentFunction`)
+          datapackResValue = CommandFunc $ -1
+        }
+
+asFunction :: DatapackM () -> DatapackM ()
+asFunction datapack = do
+  part <- unsafeNewFunction datapack
+  runRawCommand [CommandString "function", part]
+
+rec :: (DatapackM () -> DatapackM ()) -> DatapackM ()
+rec f = do
+  asFunction $
+    f $
+      DatapackM $
+        const
+          DatapackRes
+            { files = []
+            , currentFunction = [[CommandString "function", CommandFunc 0]]
+            , datapackResValue = ()
+            }
 
 -- User facing functions
 
-writeDatapack :: DatapackM () -> DatapackName -> FilePath -> IO ()
-writeDatapack datapack name path = do
-  let DatapackRes{files} = runDatapackM datapack DatapackContext{datapackName = name}
-  let fileEntries = toList files
-  forM_ fileEntries $ \(filename, function) -> do
-    let functionPath = path </> filename
-    let functionContent = functionToFile function
-    writeFile functionPath functionContent
+writeFunction :: DatapackM () -> String -> DatapackName -> FilePath -> IO ()
+writeFunction datapack functionName name path = do
+  let DatapackRes{files, currentFunction} = runDatapackM datapack DatapackContext{datapackName = name}
+  let substCommandPart :: CommandPart -> String
+      substCommandPart (CommandString str) = str
+      substCommandPart (CommandFunc n) = name ++ ":" ++ formatHash (hash $ files !! n)
+  let encodeFunction :: McFunction -> String
+      encodeFunction = intercalate "\n" . map (unwords . map substCommandPart)
+  -- `nub` could be replaced with a faster alternative
+  forM_ (nub files) $ \file -> do
+    let filepath = path </> formatHash (hash file) ++ ".mcfunction"
+    let encodedFile = encodeFunction file
+    writeFile filepath encodedFile
+  let mainpath = path </> functionName ++ ".mcfunction"
+  let encodedMain = encodeFunction currentFunction
+  writeFile mainpath encodedMain

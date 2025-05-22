@@ -8,8 +8,6 @@ myFunction :: DatapackM ()
 myFunction = do
   say "asd"
   say "asdasd"
-  asFunction $ do
-    say "test"
   let bela = NearestPlayer [NameSelector "bela333"]
   let belaFoo = Scoreboard bela "foo"
   let belaBar = Scoreboard bela "bar"
@@ -20,19 +18,13 @@ myFunction = do
     else do
       say "More Bar"
       say "Cool"
-
-recursive :: DatapackM ()
-recursive = rec "recursive" $ \recursive -> do
-  say "Forevah"
-  recursive
-
-myDatapack :: DatapackM ()
-myDatapack = do
-  newFunctionWithName "main" myFunction
-  recursive
-  return ()
+  if belaFoo <= belaBar
+    then do
+      say "Less Foo"
+    else do
+      say "Less Bar"
 
 main :: IO ()
 main = do
-  putStrLn "Running"
-  writeDatapack myDatapack "mydatapack" "datapack"
+  putStrLn "Generating datapack..."
+  writeFunction myFunction "main" "mydatapack" "datapack"
